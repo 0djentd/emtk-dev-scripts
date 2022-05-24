@@ -1,0 +1,392 @@
+#!/bin/python
+
+# ##### BEGIN GPL LICENSE BLOCK #####
+#
+# Copyright 2022, Sergey Shapochkin
+#
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; either version 2
+#  of the License, or (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software Foundation,
+#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+#
+# ##### END GPL LICENSE BLOCK #####
+
+import json
+import argparse
+import re
+
+# Unwrap args {{{
+parser = argparse.ArgumentParser()
+
+parser.add_argument('props_list',
+                    type=str,
+                    help='File with properties names list as a json array.'
+                    )
+
+parser.add_argument('--output',
+                    type=str,
+                    help='File to write result to.'
+                    )
+
+parser.add_argument('-v', '--verbose',
+                    action='count',
+                    default=0,
+                    help='Display additional info.'
+                    )
+
+parser.add_argument('-a', '--add_info',
+                    action='store_true',
+                    default=True,
+                    help='Add information about script to output.'
+                    )
+
+parser.add_argument('-n', '--props_names',
+                    action='store_true',
+                    help='Create props names list.'
+                    )
+
+parser.add_argument('-f', '--add_folds',
+                    action='store_true',
+                    default=False,
+                    help='Add vim fold markers.'
+                    )
+
+parser.add_argument('--max_iter',
+                    type=int,
+                    default=10000,
+                    help='Max amount of iterations.'
+                    )
+
+parser.add_argument('--prefix',
+                    type=str,
+                    help='String to append to all processed elements.'
+                    )
+
+parser.add_argument('--indent',
+                    type=int,
+                    help='Indentation level.'
+                    )
+
+parser.add_argument('--variations',
+                    action='store_true',
+                    default=True,
+                    help='Add prop variations.'
+                    )
+
+args = parser.parse_args()
+# }}}
+
+# Check args
+if args.prefix is not None:
+    c = [' ', '\\', '/', '.']
+    for x in c:
+        if x in args.prefix:
+            raise ValueError('This prefix cant be used.')
+
+# Variables
+if args.variations:
+    bool_variations = ['shift', 'ctl', 'alt']
+else:
+    bool_variations = []
+
+fold_o = '{{{'
+fold_c = '}}}'
+
+
+def generate_list_definition_from_list(  # {{{
+        props_names: list, prefix_1: str = '', prefix_2: str = '') -> str:
+    """Returns string with properties names list definition."""
+    """
+    Example:
+    generate_list_definition_from_list(
+            ['prop_1', 'prop_2'], prefix_1='prefix_1')
+    '''
+    props = [
+             prefix_1_prop_1,
+             prefix_1_prop_2
+             ]
+    '''
+    """
+    if not isinstance(props_names, list):
+        raise TypeError
+    for x in props_names:
+        if not isinstance(x, str):
+            raise TypeError
+
+    # Generate prefix.
+    # Examples:
+    # prefix_1_prefix_2_prop
+    # prefix_1_prop
+    # prefix_2_prop
+    prefix = ''
+    if prefix_1 is not None:
+        if not isinstance(prefix_1, str):
+            raise TypeError
+        prefix = prefix_1
+        if prefix_2 is not None:
+            if not isinstance(prefix_2, str):
+                raise TypeError
+            prefix = prefix + '_' + prefix_2
+
+    elif prefix_2 is not None:
+        if not isinstance(prefix_2, str):
+            raise TypeError
+        prefix = prefix + prefix_2
+
+    result = ''
+    if args.verbose is not None:
+        if args.verbose > 2:
+            print('Generating props list.')
+    if args.add_folds:
+        result = result\
+            + f"""
+# Properties names list for {prefix} {fold_o}"""
+
+    result = result\
+        + """
+props_names = ["""
+
+    for i, z in enumerate(props_names):
+
+        # ARGS
+        if args.max_iter is not None\
+                and i > args.max_iter:
+            print('Max amount of iterations specified, skipping.')
+            break
+
+        # get prop name
+        if prefix is not None:
+            x = f'{prefix}_{z}'
+        else:
+            x = z
+
+        if args.verbose is not None:
+            if args.verbose:
+                print(f'Adding {x} to props list.')
+
+        result = result\
+            + f"""
+               "{x}","""
+
+    result = result\
+        + """
+                ]"""
+
+    if args.add_folds:
+        result = result\
+            + f"""
+# {fold_c}
+"""
+    if not isinstance(result, str):
+        raise TypeError
+    return result
+# }}}
+
+
+def get_prop_description(prop_name, prefix_1, prefix_2):  # {{{
+    if not isinstance(prop_name, str):
+        raise TypeError
+    if not isinstance(prefix_1, str) and prefix_1 is not None:
+        raise TypeError
+    if not isinstance(prefix_2, str) and prefix_2 is not None:
+        raise TypeError
+
+    if prefix_2 is not None:
+        prefix_2_new = re.sub('_', ' ', prefix_2.title())
+        result = f'{prefix_2_new} modifier {prop_name} modal editor kbs'
+    else:
+        result = f'{prop_name} modal editor kbs'
+    return result
+# }}}
+
+
+def generate_definitions_from_list(  # {{{
+        props_names: list, prefix_1: str, prefix_2: str = '') -> str:
+    """Returns string with properties definitions."""
+    # if not isinstance(props_names, list):
+    #     raise TypeError
+    # for x in props_names:
+    #     if not isinstance(x, str):
+    #         raise TypeError
+
+    # Generate prefix.
+    # Examples:
+    # prefix_1_prefix_2_prop
+    # prefix_1_prop
+    # prefix_2_prop
+    prefix = ''
+    if prefix_1 is not None:
+        if not isinstance(prefix_1, str):
+            raise TypeError
+        prefix = prefix_1
+        if prefix_2 is not None:
+            if not isinstance(prefix_2, str):
+                raise TypeError
+            prefix = prefix + '_' + prefix_2
+
+    elif prefix_2 is not None:
+        if not isinstance(prefix_2, str):
+            raise TypeError
+        prefix = prefix + prefix_2
+
+    result = ''
+    if args.add_folds:
+        result = result\
+            + f"""
+# Properties for {prefix_2} {fold_o}
+"""
+
+    if args.verbose:
+        print('Processing props list.')
+
+    for i, z in enumerate(props_names):
+        if args.max_iter is not None\
+                and i > args.max_iter:
+            print('Max amount of iterations specified, skipping.')
+            break
+
+        if prefix is not None:
+            x = f'{prefix}_{z}'
+        else:
+            x = z
+
+        u = re.sub('_', ' ', z)
+        u = u.title()
+
+        if args.verbose is not None:
+            if args.verbose > 2:
+                print(f'Generating props for {x}')
+
+        if args.add_folds:
+            result = result\
+                + f"""
+# {u} {fold_o}"""
+
+        result = result\
+            + f"""
+{x}: StringProperty(
+    name="{get_prop_description(z, prefix_1, prefix_2)}",
+    maxlen=1,
+    default='',
+    )
+"""
+
+        for e in bool_variations:
+            result = result\
+                + f"""
+{x}_{e}: BoolProperty(
+    name="{e}",
+    default=False,
+    )
+"""
+
+        if args.add_folds:
+            result = result\
+                + f"""
+# {fold_c}"""
+
+        result = result\
+            + """
+"""
+
+    if args.add_folds:
+        result = result\
+            + f"""
+# {fold_c}
+"""
+
+    if type(result) is not str:
+        raise TypeError
+    return result
+# }}}
+
+
+# Load json file {{{
+d = None
+with open(args.props_list, 'r') as f:
+    d = json.load(f)
+
+if isinstance(d, dict):
+    for x in d:
+        if not isinstance(d[x], list):
+            raise TypeError
+elif not isinstance(d, list):
+    raise TypeError
+# }}}
+
+result = ''
+if args.add_info:
+    if isinstance(d, dict):
+        number_of_elements = 0
+        for x in d:
+            number_of_elements += len(d[x])
+
+    elif isinstance(d, list):
+        number_of_elements = len(d)
+    else:
+        raise ValueError
+
+    result = result\
+        + f"""# Modal Blender operator keyboard shortcuts generator v1.0
+
+# Total number of elements: {number_of_elements}
+# Total number of properties: {number_of_elements * len(bool_variations)}
+# Used variations: {bool_variations}
+"""
+
+if isinstance(d, dict):
+    for x in d:
+
+        # generate list
+        if args.props_names:
+            result = result + generate_list_definition_from_list(
+                    d[x], prefix_1=args.prefix, prefix_2=x.lower())
+
+        # generate defs
+        result = result + generate_definitions_from_list(
+                d[x], prefix_1=args.prefix, prefix_2=x.lower())
+        result = result\
+            + """
+"""
+
+elif isinstance(d, list):
+
+    # generate list
+    if args.props_names:
+        result = result + generate_list_definition_from_list(
+                d, prefix_1=args.prefix)
+
+    # generate defs
+    result = result + generate_definitions_from_list(
+            d, prefix_1=args.prefix)
+
+# fix folds
+if args.add_folds:
+    # {{{
+    # {{{
+    result = re.sub('\n\n\\s*#\\s*}}}', '\n# }}}', result)
+
+result = result.expandtabs(tabsize=4)
+if args.indent is not None:
+    s = ''
+    for x in range(args.indent):
+        s = s + ' '
+    result = s + result
+    result = re.sub('\n', f'\n{s}', result)
+
+# Output
+if not args.output:
+    print(result)
+else:
+    output_file = args.output
+    with open(output_file, 'w') as f_2:
+        f_2.write(result)
