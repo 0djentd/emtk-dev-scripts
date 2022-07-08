@@ -5,14 +5,8 @@ Some scripts and tools that can be useful.
 ### venv-symlink-modules
 Creates new venv and symlinks modules in `.config/blender/3.1/scripts/modules`.
 
-### setup-emtk
-creates `~/soft/addons-repos` and installs emtk
-
 ### remove-folds
 Removes vim folds from all .py files.
-
-### autopep-fix
-Runs autopep8 on all .py files.
 
 ## [generate-mod-props/](./generate-mod-props/README.md)
 This thing designed to make it easier to create modal Blender operators.
